@@ -105,10 +105,37 @@ defmodule Folderol do
     Enum.reverse (unified_vars)
   end
 
+  def postwalk([do: form] = ast, {:form, acc}) do
+    IO.puts "$Block[]"
+    scope = Enum.take_while(acc, &(&1 != :do))
+    {ast, {:form, [{:scope, scope} | acc]}} |> IO.inspect
+  end
+  def postwalk({:do, form} = ast, {:form, acc}) do
+    IO.puts "$Block{}"
+    {ast, {:form, acc}} # |> IO.inspect
+  end
+  def postwalk(:do = ast, {:form, acc}) do
+    IO.puts "$DO[]"
+    {ast, {:form, [:do | acc]}} |> IO.inspect
+  end
   def postwalk({quant, ctx, args} = ast, {:form, acc}) when quant in [:exists, :forall] do
-    [{var, _ctx, nil}, [do: block]] = args
-    IO.puts ">> :Quant #{quant} #{var}"
-    quote do: {:Quant, unquote(quant), unquote(var), unquote(ctx), unquote(block)}
+    IO.puts "$Quant #{quant}"
+    {vars, ast_scope} = Enum.split_while(args, &(case &1 do
+                                               [do: _] -> false
+                                               _ -> true
+                                             end))
+    if ast_scope == [] do
+      raise  SyntaxError, description: "scope block missing: " <> Macro.to_string(ast),
+      line: Dict.get(ctx, :line), file: __ENV__.file
+    end
+
+    IO.inspect {vars, ast_scope}
+
+    [scope | args_acc] = acc
+    varlist = unify_args(vars, args_acc, ctx)
+    rest_acct = Enum.drop(acc, length(varlist))
+    quant = quote do: {:Quant, unquote(quant), unquote(varlist), unquote(ctx), unquote(scope)}
+    {ast, {:form, [quant | rest_acct]}} #|> IO.inspect
   end
   def postwalk({conn, ctx, [_lhs, _rhs]} = ast, {:form, acc}) when conn in @binary_ops do
     IO.puts "$Conn #{conn}"
@@ -133,7 +160,7 @@ defmodule Folderol do
   end
   def postwalk(term, {:form, acc}) when is_atom(term) do
     IO.puts "$Constant: #{term}"
-    {term, {:form, [term | acc]}}
+    {term, {:form, [{:Const, term} | acc]}}
   end
   def postwalk(any, {:form, acc}) do
     IO.write ">> ANY: "
@@ -152,8 +179,11 @@ defmodule Folderol.Logic do
 
   f = form do
 #    exists(z) do p(x, y) end
-    exists(z) do p(x, y) | false end
-    #    exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
+    # exists(z) do
+    #   p(x, y) | q(y)
+    # end
+#    exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
+    exists(x) do exists(y) do p(x) | q(y) end end
   end
 
 

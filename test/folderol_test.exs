@@ -14,15 +14,6 @@ defmodule FolderolTest do
   ]
 
   test "check generator" do
-    f = form do
-      exists(z) do p(x, y) end
-      #exists(z) do p(x, y) | false end
-      #    exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
-    end
-
-
-    IO.puts ">> "
-    f |> Macro.to_string |> IO.inspect
   end
 
 end
