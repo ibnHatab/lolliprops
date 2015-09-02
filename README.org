@@ -1,0 +1,70 @@
+# Lolliprops
+
+* ILL (Intuitionistic Linear Logic)
+  no weakening and contraction rules
+
+  | ⊕ , | additive disjunction, "either A, or B, but don’t know which", "someone else’s choice" |
+  | &   | additive conjinction, "my own choice between both"                                    |
+  | ℘ ; | multiplicative disjunction, "if not A, then B"                                        |
+  | ⊗ * | multiplicative conjunction, "I have both"                                             |
+  | !   | "of course", "generate any number of A’s"                                             |
+  | ?   | "why not", "consume any number of A’s"                                                |
+  | ⊥ ^ | negation                                                                              |
+
+
+** Linear Implicationn: A ⊸ B
+   indicates that the resource A is consumed and the resource B is produced
+   A ⊸ B ≡ A⊥ ℘ B ("can B be derived using A exactly once?")
+   : eating: hungry --o full
+
+** Multiplicative Conjunction: A ⊗ B
+   both resources A and B are present
+   : euro (x) euro --o cake
+
+** Additive Disjunction: A ⊕ B
+   either resource A or B is present, but not both
+   : lottery_ticket --o win (+) lose
+
+** Additive Conjunction: A & B
+   one can choose to have resource A or resource B, but the choice is
+   exclusive
+   : euro --o tee & coffe
+
+** Bang: !A
+   one can get an arbitrary number of copies of the resource
+   : !(tee --o euro)
+
+** Assotiation rules: ⊸, ⊕, &, ⊗, !
+   !A ⊕ B ⊸ C should be read as ((!A) ⊕ B) ⊸ C
+
+
+
+* Installation
+
+  1. Add lolliprops to your list of dependencies in mix.exs:
+
+        def deps do
+          [{:lolliprops, "~> 0.0.1"}]
+        end
+
+  2. Ensure lolliprops is started before your application:
+
+        def application do
+          [applications: [:lolliprops]]
+        end
+
+
+* Folderol in Action
+
+** TODO Rewrite folderol in elixir
+   - https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-192.pdf
+
+*** Recode ML engine and test suite
+   - unquote FOL rules
+
+
+
+* FOL Web interface
+  http://logitext.mit.edu/tutorial
+
+  [[file:docs/FOL.png]]
