@@ -1,6 +1,7 @@
 defmodule FolderolTest do
   use ExUnit.Case
   import Folderol
+  import Folderol.Parser
 
 
 
@@ -12,24 +13,22 @@ defmodule FolderolTest do
     }
   ]
 
+  @ tag skip: "integration test"
   test "check generator" do
     for {str, form} <- @ill, do: IO.puts str
   end
 
   test "simple expression" do
-
     f = form do
-#    exists(z) do p(x, y) end
-    # exists(z) do
-    #   p(x, y) | q(y)
-    # end
       exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
-      #    exists(x) do exists(y) do p(z) | q(w) end end
     end
-
     # IO.puts ">> "
     # f |> IO.inspect
+  end
 
+
+  test "Folderol.Parser utils" do
+    assert {:Key, "ALL"} == token_of("ALL")
   end
 
 end

@@ -140,6 +140,8 @@ end
 
 defmodule Folderol.Parser do
 
-
+  def token_of(a) do
+    if a in ["ALL","EXISTS"] do {:Key, a} else {:Id, a} end
+  end
 
 end
