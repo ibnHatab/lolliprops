@@ -6,14 +6,30 @@ defmodule FolderolTest do
 
   @ill [
     {"(EXISTS x. P(x) | Q(x)) <->  (EXISTS x. P(x))  |  (EXISTS x. Q(x))",
-     nil
-     # form do
-     #   exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
-     # end
+     form do
+       exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
+     end
     }
   ]
 
   test "check generator" do
+    for {str, form} <- @ill, do: IO.puts str
+  end
+
+  test "simple expression" do
+
+    f = form do
+#    exists(z) do p(x, y) end
+    # exists(z) do
+    #   p(x, y) | q(y)
+    # end
+      exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
+      #    exists(x) do exists(y) do p(z) | q(w) end end
+    end
+
+    # IO.puts ">> "
+    # f |> IO.inspect
+
   end
 
 end

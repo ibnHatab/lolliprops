@@ -22,66 +22,33 @@ defmodule Folderol do
   """
   @type t :: logic_term | logic_form
 
-  @type var_name :: String.t
+  @type var_name :: atom
   @type ctx :: Dict.t
 
   @type logic_term ::
-  {:Var, var_name}
+  {:Var, var_name, ctx}
   | {:Param, var_name, [var_name]}
   | {:Bound, integer}
   | {:Fun, atom, [term]}
 
   @type logic_form ::
-    {:Pred,  var_name, ctx, [logic_term]}
-  | {:Conn,  atom, [logic_form]}
-  | {:Quant, :forall | :exist, var_name, logic_form}
+    {:Pred, atom, ctx, [var_name]}
+  | {:Conn, atom, ctx, logic_form, logic_form}
+  | {:Quant, :forall | :exist, [var_name], {:scope, [logic_form]}}
 
   @binary_ops [:>>>, :&, :|, :<>, :->]
-  @unary_ops  [:^]
+  @unary_ops  [:^] # :FIXME not parsed yet
 
+  @doc """
+  Generate S-expression for first order logic from Elixir code
+  Use stack and polosh notation (Post-DFS) to translate Elixir AST into Logic parse tree
+  """
   @spec form(any) :: t
   defmacro form(do: block) do
-    quote do
-#      unquote(Macro.prewalk(block, &prewalk/1))
-#      unquote(Macro.prewalk(block, &postwalk/1))
-      unquote(Macro.postwalk(block, {:form, []}, &postwalk/2))
-#      unquote(Macro.postwalk(block, &IO.inspect/1))
-    end
-    |> Macro.to_string |> IO.puts
+    # prints AST   Macro.postwalk(block, &IO.inspect/1) |> IO.inspect
+    {_ast, {:form, forms}} = Macro.postwalk(block, {:form, []}, &postwalk/2)
+    quote do unquote_splicing(forms) end
   end
-
-
-  # def prewalk({quant, ctx, args}) when quant in [:exists, :forall] do
-  #   [{var, _ctx, nil}, [do: block]] = args
-  #   IO.puts ">> :Quant #{quant} #{var}"
-  #   quote do: {:Quant, unquote(quant), unquote(var), unquote(ctx), unquote(block)}
-  # end
-  def prewalk({op, ctx, [lhs, rhs]}) when op in @binary_ops do
-    IO.puts ">> :Conn #{op}"
-    quote do: {:Conn, unquote(op), unquote(ctx), unquote(lhs), unquote(rhs)}
-  end
-  def prewalk({pred, ctx, args}) do
-    IO.puts ">> :Pred #{pred}"
-    IO.inspect {pred, ctx, args}
-    varlist = Enum.reduce(args, [], fn (bind, acc) ->
-      case bind do
-        {var, ctx, nil} ->
-          [{:Bind, var, ctx} | acc]
-        _ -> acc
-      end
-    end) |> Enum.reverse
-    IO.inspect varlist
-    quote do
-      {:Pred, unquote(pred), unquote(ctx), unquote(varlist)}
-    end
-  end
-  def prewalk(any), do: any # |> IO.inspect |> Macro.to_string
-
-
-  # def postwalk({var, ctx, nil}) do
-  #   IO.puts ">> :Var #{var}"
-  #   quote do: {:Var, unquote(var), unquote(ctx)}
-  # end
 
 
   defp unify_args(args, stack, ctx) do
@@ -105,21 +72,22 @@ defmodule Folderol do
     Enum.reverse (unified_vars)
   end
 
-  def postwalk([do: form] = ast, {:form, acc}) do
-    IO.puts "$Block[]"
-    scope = Enum.take_while(acc, &(&1 != :do))
-    {ast, {:form, [{:scope, scope} | acc]}} |> IO.inspect
+  def postwalk([do: _form] = ast, {:form, acc}) do
+    # IO.puts "$[do: ]"
+    {scope, acc1} = Enum.split_while(acc, &(&1 != :do))
+    [:do | rest_acc] = acc1
+    {ast, {:form, [{:scope, scope} | rest_acc]}} #|> IO.inspect
   end
-  def postwalk({:do, form} = ast, {:form, acc}) do
-    IO.puts "$Block{}"
+  def postwalk({:do, _form} = ast, {:form, acc}) do
+    # IO.puts "${:do}"
     {ast, {:form, acc}} # |> IO.inspect
   end
   def postwalk(:do = ast, {:form, acc}) do
-    IO.puts "$DO[]"
-    {ast, {:form, [:do | acc]}} |> IO.inspect
+    # IO.puts "$:do"
+    {ast, {:form, [:do | acc]}} #|> IO.inspect
   end
   def postwalk({quant, ctx, args} = ast, {:form, acc}) when quant in [:exists, :forall] do
-    IO.puts "$Quant #{quant}"
+    # IO.puts "$Quant #{quant}"
     {vars, ast_scope} = Enum.split_while(args, &(case &1 do
                                                [do: _] -> false
                                                _ -> true
@@ -129,22 +97,20 @@ defmodule Folderol do
       line: Dict.get(ctx, :line), file: __ENV__.file
     end
 
-    IO.inspect {vars, ast_scope}
-
     [scope | args_acc] = acc
     varlist = unify_args(vars, args_acc, ctx)
-    rest_acct = Enum.drop(acc, length(varlist))
+    rest_acct = Enum.drop(args_acc, length(varlist))
     quant = quote do: {:Quant, unquote(quant), unquote(varlist), unquote(ctx), unquote(scope)}
     {ast, {:form, [quant | rest_acct]}} #|> IO.inspect
   end
   def postwalk({conn, ctx, [_lhs, _rhs]} = ast, {:form, acc}) when conn in @binary_ops do
-    IO.puts "$Conn #{conn}"
+    # IO.puts "$Conn #{conn}"
     [qrhs, qlhs | rest_acc] = acc # reversed head
     conn = quote do: {:Conn, unquote(conn), unquote(ctx), unquote(qlhs), unquote(qrhs)}
     {ast, {:form, [conn | rest_acc]}} #|> IO.inspect
   end
   def postwalk({pred, ctx, args} = ast, {:form, acc}) when is_atom(pred) and is_list(args) do
-    IO.puts "$Pred: #{pred}"
+    # IO.puts "$Pred: #{pred}"
     varlist = unify_args(args, acc, ctx)
     rest_acct = Enum.drop(acc, length(varlist))
 
@@ -155,43 +121,25 @@ defmodule Folderol do
   end
   def postwalk({var, ctx, nil} = ast, {:form, acc}) do
     form = quote do: {:Var, unquote(var), unquote(ctx)}
-    IO.puts "$Var: #{var}"
+    # IO.puts "$Var: #{var}"
     {ast, {:form, [form | acc]}} #|> IO.inspect
   end
   def postwalk(term, {:form, acc}) when is_atom(term) do
-    IO.puts "$Constant: #{term}"
+    # IO.puts "$Constant: #{term}"
     {term, {:form, [{:Const, term} | acc]}}
   end
-  def postwalk(any, {:form, acc}) do
-    IO.write ">> ANY: "
-    any |> IO.inspect
-    IO.write ">> acc: "
-    acc |> Macro.to_string |> IO.puts
-    {any, {:form, acc}}
-  end
-  # def postwalk(any, acc), do: {any, acc} |> IO.inspect
-
+  def postwalk(any, acc), do: {any, acc} |> IO.inspect
 
 end
 
 defmodule Folderol.Logic do
   import Folderol
 
-  f = form do
-#    exists(z) do p(x, y) end
-    # exists(z) do
-    #   p(x, y) | q(y)
-    # end
-#    exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
-    exists(x) do exists(y) do p(x) | q(y) end end
-  end
-
-
-  IO.puts ">> "
-  f |> Macro.to_string |> IO.inspect
 
 end
 
 defmodule Folderol.Parser do
+
+
 
 end
