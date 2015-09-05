@@ -13,7 +13,7 @@ defmodule FolderolTest do
     }
   ]
 
-  @ tag skip: "integration test"
+  @tag skip: "integration test"
   test "check generator" do
     for {str, form} <- @ill, do: IO.puts str
   end
@@ -50,11 +50,42 @@ defmodule FolderolTest do
   end
 
   test "Scanning, recognizing --> and <->, skipping blanks, etc." do
-
+    # scan([], explode"(EXISTS x. P(x) | Q(x)) <->  (EXISTS x. P(x))  |  (EXISTS x. Q(x))");
+    # > val it =
+    # it = [Key "(", Key "EXISTS", Id "x", Key ".", Id "P", Key "(", Id "x", Key ")",
+    #  Key "|", Id "Q", Key "(", Id "x", Key ")", Key ")", Key "<->", Key "(",
+    #  Key "EXISTS", Id "x", Key ".", Id "P", Key "(", Id "x", Key ")", Key ")",
+    #  Key "|", Key "(", Key "EXISTS", Id "x", Key ".", Id "Q", Key "(", Id "x",
+    #  Key ")", Key ")"]
+    str = '(EXISTS x. P(x) | Q(x)) <->  (EXISTS x. P(x))  |  (EXISTS x. Q(x))'
+    it = [{:Key, '('}, {:Key, 'EXISTS'}, {:Id, 'x'}, {:Key, '.'},
+          {:Id, 'P'}, {:Key, '('}, {:Id, 'x'}, {:Key, ')'},
+          {:Key, '|'},
+          {:Id, 'Q'}, {:Key, '('}, {:Id, 'x'}, {:Key, ')'}, {:Key, ')'},
+           {:Key, '<->'},
+           {:Key, '('}, {:Key, 'EXISTS'}, {:Id, 'x'}, {:Key, '.'},
+           {:Id, 'P'}, {:Key, '('}, {:Id, 'x'}, {:Key, ')'}, {:Key, ')'},
+           {:Key, '|'},
+           {:Key, '('}, {:Key, 'EXISTS'}, {:Id, 'x'}, {:Key, '.'},
+           {:Id, 'Q'}, {:Key, '('}, {:Id, 'x'}, {:Key, ')'}, {:Key, ')'}]
+    tokens = scan([], str)
+    assert tokens == it
   end
 
-  test "Parsing a list of tokens" do
+  test "Parsing tokens" do
+    assert {{:Conn, '~', [{Pred, 'A', []}]}, []} == parse( scan( [], '~A'))
+    assert {{:Pred, 'Q', [{:Fun, 'x', []}]}, []} == parse( scan( [], 'Q(x)'))
+    assert {{:Pred, 'Q', [{:Fun, 'x', []}]}, []} == parse( scan( [], 'P(x) | Q(x)'))
+  end
 
+  @tag skip: "FIXME: parser"
+  test "Parsing a list of tokens" do
+    tokens = scan([], '(EXISTS x. P(x) | Q(x))')
+    {ast, rest} = parse tokens
+    expected = {:Quant, "EXISTS", "x",
+                {:Conn, "|", [{:Pred, "P", [{:Bound, 0}]}, {:Pred, "Q", [{:Bound, 0}]}]}}
+    assert ast == expected
+    assert rest == []
   end
 
   test "Abstraction of a formula over t (containing no bound vars)." do

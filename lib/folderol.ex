@@ -193,17 +193,19 @@ defmodule Folderol.Parser do
   def scan(front_toks, [?-, ?-, ?> | cs]), do:  scan([{:Key, '-->'} | front_toks], cs)
   def scan(front_toks, [?<, ?-, ?> | cs]), do:  scan([{:Key, '<->'} | front_toks],  cs)
   def scan(front_toks, [c|cs]) when c in [?\s, ?\t, ?\n], do: scan(front_toks,  cs)
-
   def scan(front_toks, [c|cs]) do
     if is_letter_or_digit(c) do
       scannext(front_toks, scan_ident([c], cs))
-    else  scan([{:Key, [c]} | front_toks],  cs) end
+    else scan([{:Key, [c]} | front_toks], cs) end
   end
-  def scannext(front_toks, {tok, cs}), do: scan([tok|front_toks],  cs)
+  def scannext(front_toks, {tok, cs}), do: scan([tok|front_toks], cs)
 
   # Parsing a list of tokens
-  def apfst(f, {x, toks}) when is_function(f), do: {fn y -> f.(x, y) end, toks}
-  def apfst3(f, {x, y, toks}) when is_function(f), do: {fn xs -> f.(x, y, xs) end, toks}
+  # fun apfst f (x,toks) = (f x, toks);
+  def apfst(f, {x, toks}) when is_function(f, 1), do: {f.(x), toks}
+#  def apfst2(f, {x, toks}) when is_function(f, 2), do: {fn y -> f.(x, y) end, toks}
+  # def apfst2(f, {x, toks}) when is_function(f, 1), do: {f.(x), toks}
+  # def apfst3(f, {x, y, toks}) when is_function(f, 3), do: {fn xs -> f.(x, y, xs) end, toks}
   # (*Functions for constructing results*)
   def cons(x, xs), do: [x | xs];
   def makeFun(fu, ts), do: {:Fun, fu, ts}
@@ -221,7 +223,7 @@ defmodule Folderol.Parser do
 
   def parse_repeat1({a,parsefn}, toks) do #          (*    <phrase>a...a<phrase>  *)
       {u, toks2} = parsefn.(toks)
-      apfst({&cons/2, u}, parse_repeat({a, parsefn}, toks2))
+      apfst(&(cons u, &1), parse_repeat({a, parsefn}, toks2))
   end
 
   def rightparen({x, [{:Key, ')'} | toks]}), do: {x, toks}
@@ -229,7 +231,7 @@ defmodule Folderol.Parser do
                                             line: __ENV__.line, file: __ENV__.file}
 
   def parse_term([{:Id, a}, {:Key, '('} | toks]) do
-        apfst({&makeFun/2, a}, {rightparen(parse_repeat1(',', &parse_term/1)), toks})
+        apfst(&(makeFun a, &1), {rightparen(parse_repeat1(',', &parse_term/1)), toks})
   end
   def parse_term([{:Id, a} | toks]), do: {{:Fun,a,[]}, toks}
   def parse_term([{:Key, '?'}, {:Id, a} | toks]), do: {{:Var, a}, toks}
@@ -250,24 +252,25 @@ defmodule Folderol.Parser do
   parsing stops at an operator with lower precedence
   """
   def parse([{:Key, 'ALL'}, {:Id, a}, {:Key, '.'} | toks]) do
-    apfst3(&makeQuant/3, {"ALL", a, parse(toks)}) end
+    apfst(&(makeQuant "ALL", a, &1), parse(toks)) end
   def parse([{:Key, 'EXISTS'}, {:Id, a}, {:Key, '.'} | toks]) do
-    apfst3(&makeQuant/3, {"EXISTS", a, parse(toks)}) end
+    apfst(&(makeQuant "EXISTS", a, &1), parse(toks)) end
   def parse(toks), do: parsefix(0, parse_atom(toks))
 
-  def parsefix(prec, {a, [{Key, co} | toks]}) do
+  def parsefix(prec, {a, [{:Key, co} | toks]}) do
+    IO.inspect co
     if prec_of(co) < prec do {a, [{:Key, co} | toks]}
     else parsefix(prec,
-                  apfst3(&makeConn/3, {co, a,
-                         parsefix(prec_of(co), parse_atom(toks))}))
+                  apfst(&(makeConn co, a, &1),
+                        parsefix(prec_of(co), parse_atom(toks))))
     end
   end
-  def parsefix(_prec, {a, toks}), do: {a, toks}
+  def parsefix(_prec, {a, toks}), do: {a, toks} |> IO.inspect
 
   def parse_atom([{:Key, '~'} | toks]), do: apfst(&makeNeg/1, parse_atom(toks))
   def parse_atom([{:Key, '('} | toks]), do: rightparen(parse(toks))
   def parse_atom([{:Id, pr}, {:Key, '('} | toks]) do
-    apfst(&makePred/2, {pr, rightparen( parse_repeat1({',', &parse_term/1}, toks))}) end
+    apfst(&(makePred pr, &1), rightparen( parse_repeat1({',', &parse_term/1}, toks))) end
   def parse_atom([{:Id, pr} | toks]), do: {{Pred, pr, []}, toks}
   def parse_atom(_), do: raise %SyntaxError{description: "Syntax of formula",
                                             line: __ENV__.line, file: __ENV__.file}
@@ -282,6 +285,9 @@ defmodule Folderol.Parser do
 end
 
 defmodule LocalTest do
-    # import Folderol.Parser
+  import Folderol.Parser
+  tokens = scan [], '~A'
+  {ast, rest} = parse tokens
+  IO.inspect ast
 
 end

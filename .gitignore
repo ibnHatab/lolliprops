@@ -10,4 +10,4 @@ erl_crash.dump
 *\~
 ._*
 *.swp
-
+*.beam
