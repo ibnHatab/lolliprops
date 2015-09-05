@@ -124,7 +124,6 @@ fun scan (front_toks, []) = rev front_toks    (*end of char list*)
       else  scan (Key(str c) :: front_toks,  cs)
 and scannext (front_toks, (tok, cs)) = scan (tok::front_toks,  cs);
 
-
 (*Parsing a list of tokens*)
 
 fun apfst f (x,toks) = (f x, toks);

@@ -27,8 +27,46 @@ defmodule FolderolTest do
   end
 
 
-  test "Folderol.Parser utils" do
-    assert {:Key, "ALL"} == token_of("ALL")
+  test "Scanning of identifiers and keywords" do
+    assert {:Key, 'ALL'} == token_of('ALL')
+    assert {:Key, 'EXISTS'} == token_of('EXISTS')
+    assert {:Id, 'ANY'} == token_of('ANY')
+
+    assert is_letter_or_digit(?c) == true
+    assert is_letter_or_digit(?Z) == true
+    assert is_letter_or_digit(?0) == true
+    assert is_letter_or_digit(?9) == true
+
+    assert is_letter_or_digit(?-) == false
+    assert is_letter_or_digit(?_) == false
+
+    assert scan_ident([], 'EXISTS') == {{:Key, 'EXISTS'}, []}
+    assert scan_ident([], 'SOME123') == {{:Id, 'SOME123'}, []}
+    assert scan_ident([], 'SOME123 OTHER') == {{:Id, 'SOME123'}, ' OTHER'}
+
+    assert scan([{:Id, 'N1'}, {:Id, 'N2'}], []) == [{:Id, 'N2'}, {:Id, 'N1'}]
+    assert scan([], ' --> ') == [{:Key, '-->'}]
+    assert scan([], ' <-> P ') == [Key: '<->', Id: 'P']
+  end
+
+  test "Scanning, recognizing --> and <->, skipping blanks, etc." do
+
+  end
+
+  test "Parsing a list of tokens" do
+
+  end
+
+  test "Abstraction of a formula over t (containing no bound vars)." do
+    # abstract
+  end
+
+  test "Replace (Bound 0) in formula with t (containing no bound vars)." do
+    # subst_bound
+  end
+
+  test "Repeated parsing, returning the list of results" do
+    # parse_repeat
   end
 
 end
