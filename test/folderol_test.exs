@@ -1,30 +1,8 @@
-defmodule FolderolTest do
-  use ExUnit.Case
+defmodule FolderolTest.Parser do
+  use ExUnit.Case, async: false
+
   import Folderol
   import Folderol.Parser
-
-
-
-  @ill [
-    {"(EXISTS x. P(x) | Q(x)) <->  (EXISTS x. P(x))  |  (EXISTS x. Q(x))",
-     form do
-       exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
-     end
-    }
-  ]
-
-  @tag skip: "integration test"
-  test "check generator" do
-    for {str, form} <- @ill, do: IO.puts str
-  end
-
-  test "simple expression" do
-    f = form do
-      exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
-    end
-    # IO.puts ">> "
-    # f |> IO.inspect
-  end
 
 
   test "Scanning of identifiers and keywords" do
@@ -75,18 +53,107 @@ defmodule FolderolTest do
   test "Parsing tokens" do
     assert {{:Conn, '~', [{Pred, 'A', []}]}, []} == parse( scan( [], '~A'))
     assert {{:Pred, 'Q', [{:Fun, 'x', []}]}, []} == parse( scan( [], 'Q(x)'))
-    assert {{:Pred, 'Q', [{:Fun, 'x', []}]}, []} == parse( scan( [], 'P(x) | Q(x)'))
+    assert {{:Conn, '|', [{Pred, 'P', []}, {Pred, 'Q', []}]}, []} == parse( scan( [], 'P | Q'))
+    assert {{:Conn, '|',
+             [{:Pred, 'P', [{:Fun, 'x', []}]},
+              {:Pred, 'Q', [{:Fun, 'x', []}]}]}, []} == parse( scan( [], 'P(x) | Q(x)'))
+    assert {{:Quant, 'EXISTS', 'x',
+             {:Conn, '|', [{:Pred, 'P', [Bound: 0]},
+                           {:Pred, 'Q', [Bound: 0]}]}}, []} == parse( scan( [], '(EXISTS x. P(x) | Q(x))'))
   end
 
-  @tag skip: "FIXME: parser"
+  @run_goal [
+    # (*absorptive laws of & and | *)
+    'P & P <-> P',
+    'P | P <-> P',
+    # (*commutative laws of & and | *)
+    'P & Q  <->  Q & P',
+    'P | Q  <->  Q | P',
+    # (*associative laws of & and | *)
+    '(P & Q) & R  <->  P & (Q & R)',
+    '(P | Q) | R  <->  P | (Q | R)',
+    # (*distributive laws of & and | *)
+    '(P & Q) | R  <-> (P | R) & (Q | R)',
+    '(P | Q) & R  <-> (P & R) | (Q & R)',
+    # (*Laws involving implication*)
+    '(P|Q --> R) <-> (P-->R) & (Q-->R)',
+    '(P & Q --> R) <-> (P--> (Q-->R))',
+    '(P --> Q & R) <-> (P-->Q)  &  (P-->R)',
+    # (*Classical theorems*)
+    'P|Q --> P| ~P&Q',
+    '((P-->Q)-->Q) <-> P|Q',
+    '(P-->Q)&(~P-->R)  -->  (P&Q | R)',
+    'P&Q | ~P&R  <->  (P-->Q)&(~P-->R)',
+    '(P-->Q) | (P-->R)  <->  (P --> Q | R)',
+    '(P<->Q) <-> (Q<->P)',
+    '(EXISTS x.EXISTS y.P(x,y))  <->  (EXISTS y.EXISTS x.P(x,y))',
+
+    '(ALL x. P(x) & Q(x))  <->  (ALL x. P(x))  &  (ALL x. Q(x))',
+    '(ALL x. P(x))  |  (ALL x. Q(x))   -->  (ALL x. P(x) | Q(x))',
+    '(ALL x.P(x)) | Q  <->  (ALL x. P(x) | Q)',
+
+    '(ALL x. P --> Q(x))  <->  (P --> (ALL x. Q(x)))',
+    '(ALL x.P(x)-->Q)  <->  ((EXISTS x.P(x)) --> Q)',
+    '(EXISTS x. P(x) | Q(x)) <->  (EXISTS x. P(x))  |  (EXISTS x. Q(x))',
+    '(EXISTS x. P(x) & Q(x)) -->  (EXISTS x. P(x))  &  (EXISTS x. Q(x))',
+    '(EXISTS x. P --> Q(x))  <->  (P --> (EXISTS x. Q(x)))',
+    '(EXISTS x.P(x)-->Q)  <->  (ALL x.P(x)) --> Q',
+    # (*hard: needs multiple instantiation of ALL and may loop*)
+    '(ALL x. P(x)-->P(f(x))) --> (ALL y. P(y) --> P(f(f(f(y)))))',
+    # (*needs double instantiation of EXISTS*)
+    'EXISTS x. P(x) --> P(f(x)) & P(g(x))',
+    'ALL x. ALL y. EXISTS z. P(z) --> P(x) & P(y)',
+    'EXISTS x. P(x) --> (ALL x. P(x))',
+    # (*Principia Mathematica *11.53  *)
+    '''
+    (ALL x. ALL y. P(x) --> Q(y))
+    <-> ((EXISTS x. P(x)) --> (ALL y. Q(y)))
+    ''',
+    # (*Principia Mathematica *11.55  *)
+    '''
+    (EXISTS x. EXISTS y. P(x) & Q(x,y))
+    <-> (EXISTS x. P(x) & (EXISTS y. Q(x,y)))
+    ''',
+    # (*Principia Mathematica *11.61  *)
+    '''
+    (EXISTS y. ALL x. P(x) --> Q(x,y))
+    --> (ALL x. P(x) --> (EXISTS y. Q(x,y)))
+    ''',
+    # (*Basic test of quantifier reasoning*)
+    '(EXISTS y. ALL x. P(x,y))  -->  (ALL x. EXISTS y. P(x,y))',
+    # (*various non-valid formulae*)
+    '(ALL x. EXISTS y. P(x,y))  -->  (EXISTS y. ALL x. P(x,y))',
+    # (*Should not be provable: different eigenvariables must be chosen*)
+    '(EXISTS x.P(x)) --> (ALL x. P(x))',
+    'P(?aaaa) --> (ALL x.P(x))',
+    '(P(?aaaa) --> (ALL x.Q(x))) --> (ALL x. P(x) --> Q(x))',
+    # (*Not provable, causes looping!  simplest example of Folderol's stupidity*)
+    '(ALL x. P(x)) --> Q',
+    '(ALL x. P(x))  -->  (EXISTS x. P(x))',
+    '(ALL x. P(x)-->Q(x)) & (EXISTS x.P(x)) --> (EXISTS x.Q(x))',
+    '(P--> (EXISTS x.Q(x))) & P--> (EXISTS x.Q(x))'
+  ]
+
+  #@tag skip: "FIXME: parser"
   test "Parsing a list of tokens" do
-    tokens = scan([], '(EXISTS x. P(x) | Q(x))')
-    {ast, rest} = parse tokens
-    expected = {:Quant, "EXISTS", "x",
-                {:Conn, "|", [{:Pred, "P", [{:Bound, 0}]}, {:Pred, "Q", [{:Bound, 0}]}]}}
-    assert ast == expected
-    assert rest == []
+    for str <- @run_goal do
+      IO.puts str
+      tokens = scan([], str)
+      {_ast, rest} = parse tokens
+      # assert rest == []
+    end
   end
+
+  test "Repeated parsing, returning the list of results" do
+    # parse_repeat
+  end
+
+end
+
+defmodule FolderolTest.Logic do
+  use ExUnit.Case
+  import Folderol
+  import Folderol.Parser
 
   test "Abstraction of a formula over t (containing no bound vars)." do
     # abstract
@@ -96,11 +163,35 @@ defmodule FolderolTest do
     # subst_bound
   end
 
-  test "Repeated parsing, returning the list of results" do
-    # parse_repeat
+end
+
+defmodule FolderolTest do
+  use ExUnit.Case
+  import Folderol
+  import Folderol.Parser
+
+  @ill [
+    {"(EXISTS x. P(x) | Q(x)) <->  (EXISTS x. P(x))  |  (EXISTS x. Q(x))",
+     form do
+       exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
+     end
+    }
+  ]
+
+  @tag skip: "integration test"
+  test "check generator" do
+    for {str, form} <- @ill, do: IO.puts str
   end
 
+  test "simple expression" do
+    f = form do
+      exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
+    end
+    # IO.puts ">> "
+    # f |> IO.inspect
+  end
 end
+
 
 # quote do (exist x.( A || B ) ) end
 

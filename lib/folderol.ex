@@ -252,20 +252,19 @@ defmodule Folderol.Parser do
   parsing stops at an operator with lower precedence
   """
   def parse([{:Key, 'ALL'}, {:Id, a}, {:Key, '.'} | toks]) do
-    apfst(&(makeQuant "ALL", a, &1), parse(toks)) end
+    apfst(&(makeQuant 'ALL', a, &1), parse(toks)) end
   def parse([{:Key, 'EXISTS'}, {:Id, a}, {:Key, '.'} | toks]) do
-    apfst(&(makeQuant "EXISTS", a, &1), parse(toks)) end
+    apfst(&(makeQuant 'EXISTS', a, &1), parse(toks)) end
   def parse(toks), do: parsefix(0, parse_atom(toks))
 
   def parsefix(prec, {a, [{:Key, co} | toks]}) do
-    IO.inspect co
     if prec_of(co) < prec do {a, [{:Key, co} | toks]}
     else parsefix(prec,
                   apfst(&(makeConn co, a, &1),
                         parsefix(prec_of(co), parse_atom(toks))))
     end
   end
-  def parsefix(_prec, {a, toks}), do: {a, toks} |> IO.inspect
+  def parsefix(_prec, {a, toks}), do: {a, toks}
 
   def parse_atom([{:Key, '~'} | toks]), do: apfst(&makeNeg/1, parse_atom(toks))
   def parse_atom([{:Key, '('} | toks]), do: rightparen(parse(toks))
