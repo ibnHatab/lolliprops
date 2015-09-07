@@ -281,6 +281,18 @@ defmodule Folderol.Parser do
 
   def read(a), do: parse_end(parse(scan([], a)))
 
+
+
+  @doc "Printing: conversion of terms/formulae to strings"
+  def enclose(a), do: '(' ++ a ++ ')'
+  def conc_list(sep, xs) do
+    reduced = Enum.reduce(xs, :first, fn
+      x, :first -> x
+      x, acc -> acc ++ sep ++ x
+    end)
+    if reduced == :first, do: '', else: reduced
+  end
+
 end
 
 defmodule LocalTest do
