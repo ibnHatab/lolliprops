@@ -231,7 +231,7 @@ defmodule Folderol.Parser do
                                             line: __ENV__.line, file: __ENV__.file}
 
   def parse_term([{:Id, a}, {:Key, '('} | toks]) do
-        apfst(&(makeFun a, &1), {rightparen(parse_repeat1(',', &parse_term/1)), toks})
+        apfst(&(makeFun a, &1), rightparen(parse_repeat1({',', &parse_term/1}, toks)))
   end
   def parse_term([{:Id, a} | toks]), do: {{:Fun,a,[]}, toks}
   def parse_term([{:Key, '?'}, {:Id, a} | toks]), do: {{:Var, a}, toks}
@@ -270,7 +270,7 @@ defmodule Folderol.Parser do
   def parse_atom([{:Key, '('} | toks]), do: rightparen(parse(toks))
   def parse_atom([{:Id, pr}, {:Key, '('} | toks]) do
     apfst(&(makePred pr, &1), rightparen( parse_repeat1({',', &parse_term/1}, toks))) end
-  def parse_atom([{:Id, pr} | toks]), do: {{Pred, pr, []}, toks}
+  def parse_atom([{:Id, pr} | toks]), do: {{:Pred, pr, []}, toks}
   def parse_atom(_), do: raise %SyntaxError{description: "Syntax of formula",
                                             line: __ENV__.line, file: __ENV__.file}
 

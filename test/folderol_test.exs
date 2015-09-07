@@ -51,9 +51,9 @@ defmodule FolderolTest.Parser do
   end
 
   test "Parsing tokens" do
-    assert {{:Conn, '~', [{Pred, 'A', []}]}, []} == parse( scan( [], '~A'))
+    assert {{:Conn, '~', [{:Pred, 'A', []}]}, []} == parse( scan( [], '~A'))
     assert {{:Pred, 'Q', [{:Fun, 'x', []}]}, []} == parse( scan( [], 'Q(x)'))
-    assert {{:Conn, '|', [{Pred, 'P', []}, {Pred, 'Q', []}]}, []} == parse( scan( [], 'P | Q'))
+    assert {{:Conn, '|', [{:Pred, 'P', []}, {:Pred, 'Q', []}]}, []} == parse( scan( [], 'P | Q'))
     assert {{:Conn, '|',
              [{:Pred, 'P', [{:Fun, 'x', []}]},
               {:Pred, 'Q', [{:Fun, 'x', []}]}]}, []} == parse( scan( [], 'P(x) | Q(x)'))
@@ -133,14 +133,11 @@ defmodule FolderolTest.Parser do
     '(ALL x. P(x)-->Q(x)) & (EXISTS x.P(x)) --> (EXISTS x.Q(x))',
     '(P--> (EXISTS x.Q(x))) & P--> (EXISTS x.Q(x))'
   ]
-
-  #@tag skip: "FIXME: parser"
   test "Parsing a list of tokens" do
     for str <- @run_goal do
-      IO.puts str
       tokens = scan([], str)
       {_ast, rest} = parse tokens
-      # assert rest == []
+      assert rest == []
     end
   end
 
