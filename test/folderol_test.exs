@@ -67,22 +67,22 @@ defmodule FolderolTest.Parser do
     'P & P <-> P',
     'P | P <-> P',
     # (*commutative laws of & and | *)
-    'P & Q  <->  Q & P',
-    'P | Q  <->  Q | P',
+    'P & Q <-> Q & P',
+    'P | Q <-> Q | P',
     # (*associative laws of & and | *)
-    '(P & Q) & R  <->  P & (Q & R)',
-    '(P | Q) | R  <->  P | (Q | R)',
+    '(P & Q) & R <-> P & (Q & R)',
+    '(P | Q) | R <-> P | (Q | R)',
     # (*distributive laws of & and | *)
-    '(P & Q) | R  <-> (P | R) & (Q | R)',
-    '(P | Q) & R  <-> (P & R) | (Q & R)',
+    'P & Q | R <-> (P | R) & (Q | R)',
+    'P | Q & R <-> P & R | Q & R',
     # (*Laws involving implication*)
-    '(P|Q --> R) <-> (P-->R) & (Q-->R)',
-    '(P & Q --> R) <-> (P--> (Q-->R))',
-    '(P --> Q & R) <-> (P-->Q)  &  (P-->R)',
+    '(P | Q --> R) <-> (P --> R) & (Q --> R)',
+    '(P & Q --> R) <-> (P --> (Q --> R))',
+    '(P --> Q & R) <-> (P --> Q) & (P --> R)',
     # (*Classical theorems*)
-    'P|Q --> P| ~P&Q',
+    'P | Q --> P | ~P & Q',
     '((P-->Q)-->Q) <-> P|Q',
-    '(P-->Q)&(~P-->R)  -->  (P&Q | R)',
+    '(P-->Q)&(~P-->R)  --> P & Q | R',
     'P&Q | ~P&R  <->  (P-->Q)&(~P-->R)',
     '(P-->Q) | (P-->R)  <->  (P --> Q | R)',
     '(P<->Q) <-> (Q<->P)',
@@ -97,7 +97,7 @@ defmodule FolderolTest.Parser do
     '(EXISTS x. P(x) | Q(x)) <->  (EXISTS x. P(x))  |  (EXISTS x. Q(x))',
     '(EXISTS x. P(x) & Q(x)) -->  (EXISTS x. P(x))  &  (EXISTS x. Q(x))',
     '(EXISTS x. P --> Q(x))  <->  (P --> (EXISTS x. Q(x)))',
-    '(EXISTS x.P(x)-->Q)  <->  (ALL x.P(x)) --> Q',
+    '(EXISTS x.P(x)-->Q)  <->  ((ALL x.P(x))-->Q)',
     # (*hard: needs multiple instantiation of ALL and may loop*)
     '(ALL x. P(x)-->P(f(x))) --> (ALL y. P(y) --> P(f(f(f(y)))))',
     # (*needs double instantiation of EXISTS*)
@@ -141,8 +141,15 @@ defmodule FolderolTest.Parser do
     end
   end
 
-  test "Repeated parsing, returning the list of results" do
-    # parse_repeat
+  def srink(str), do: Enum.filter(str, &(&1 != ?\s && &1 != ?\n))
+
+  test "Printing: conversion of terms/formulae to strings" do
+
+    for str <- @run_goal do
+      form = read str
+      repr = stringof(form) |> srink
+      assert srink(str) == repr
+    end
   end
 
 end

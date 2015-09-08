@@ -158,7 +158,6 @@ defmodule Folderol.Logic do
   defp do_abstract(t, i, {:Conn, b, as}), do: {:Conn, b, Enum.map(as, &(do_abstract(t, i, &1)))}
   defp do_abstract(t, i, {:Quant, q, b, a}), do: {:Quant, q, b, do_abstract(t, i+1, a)}
 
-
   @doc "Replace (Bound 0) in formula with t (containing no bound vars)."
   @spec subst_bound(Folderol.logic_term, Folderol.logic_form) :: Folderol.logic_form
   def subst_bound(t, form) do
@@ -201,11 +200,7 @@ defmodule Folderol.Parser do
   def scannext(front_toks, {tok, cs}), do: scan([tok|front_toks], cs)
 
   # Parsing a list of tokens
-  # fun apfst f (x,toks) = (f x, toks);
   def apfst(f, {x, toks}) when is_function(f, 1), do: {f.(x), toks}
-#  def apfst2(f, {x, toks}) when is_function(f, 2), do: {fn y -> f.(x, y) end, toks}
-  # def apfst2(f, {x, toks}) when is_function(f, 1), do: {f.(x), toks}
-  # def apfst3(f, {x, y, toks}) when is_function(f, 3), do: {fn xs -> f.(x, y, xs) end, toks}
   # (*Functions for constructing results*)
   def cons(x, xs), do: [x | xs];
   def makeFun(fu, ts), do: {:Fun, fu, ts}
@@ -279,13 +274,13 @@ defmodule Folderol.Parser do
   def parse_end({_, [_|_]}), do: raise %SyntaxError{description: "Extra characters in formula",
                                                     line: __ENV__.line, file: __ENV__.file}
 
+  @spec read(char_list) :: Folderol.logic_form
   def read(a), do: parse_end(parse(scan([], a)))
 
 
-
-  @doc "Printing: conversion of terms/formulae to strings"
+  # "Printing: conversion of terms/formulae to strings"
   def enclose(a), do: '(' ++ a ++ ')'
-  def conc_list(sep, xs) do
+  def conc_list(xs, sep) do
     reduced = Enum.reduce(xs, :first, fn
       x, :first -> x
       x, acc -> acc ++ sep ++ x
@@ -293,12 +288,40 @@ defmodule Folderol.Parser do
     if reduced == :first, do: '', else: reduced
   end
 
+  def makestring(thing), do: to_string(thing) |> String.to_char_list
+
+  def stringof_term({:Param, a, _}), do: a
+  def stringof_term({:Var, a}), do: '?' ++ a
+  def stringof_term({:Bound, i}), do: 'B.' ++ makestring(i)
+  def stringof_term({:Fun, a, ts}), do:  a ++ stringof_args(ts)
+
+  def stringof_args([]), do: []
+  def stringof_args(ts), do: ts |> Enum.map(&stringof_term/1) |> conc_list(',') |> enclose
+
+  def stringof_form(_prec, {:Pred, a, ts}), do: a ++ stringof_args(ts)
+  def stringof_form(_prec, {:Conn, '~', [as]}), do: '~' ++ stringof_form(prec_of('~'), as)
+  def stringof_form(prec, {:Conn, cn, [as,bs]}) do
+    stringf = &(stringof_form(max(prec_of(cn), prec), &1))
+    zs = stringf.(as) ++ ' ' ++ cn ++ ' ' ++ stringf.(bs)
+    if prec_of(cn) <= prec, do: enclose(zs), else: zs
+  end
+  def stringof_form(prec, {:Quant, q, b, as}) do
+    bs = subst_bound({:Fun, b, []}, as)
+    zs = q ++ ' ' ++ b ++ '. ' ++ stringof_form(0, bs)
+    if prec>0, do: enclose(zs), else: zs
+  end
+  def stringof_form(_prec, _), do: raise raise %SyntaxError{description: "stringof_form: Bad formula",
+                                                            line: __ENV__.line, file: __ENV__.file}
+  @doc "Printing: conversion of terms/formulae to strings"
+  @spec stringof(Folderol.logic_form) :: char_list
+  def stringof(f), do: stringof_form(0, f)
+
 end
 
 defmodule LocalTest do
   import Folderol.Parser
-  tokens = scan [], '~A'
-  {ast, rest} = parse tokens
-  IO.inspect ast
+  # tokens = scan [], '~A'
+  # {ast, rest} = parse tokens
+  # IO.inspect stringo(ast)
 
 end
