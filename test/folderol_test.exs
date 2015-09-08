@@ -157,7 +157,6 @@ end
 defmodule FolderolTest.Logic do
   use ExUnit.Case
   import Folderol
-  import Folderol.Parser
 
   test "Abstraction of a formula over t (containing no bound vars)." do
     # abstract
@@ -172,7 +171,6 @@ end
 defmodule FolderolTest do
   use ExUnit.Case
   import Folderol
-  import Folderol.Parser
 
   @ill [
     {"(EXISTS x. P(x) | Q(x)) <->  (EXISTS x. P(x))  |  (EXISTS x. Q(x))",
@@ -182,17 +180,10 @@ defmodule FolderolTest do
     }
   ]
 
-  @tag skip: "integration test"
-  test "check generator" do
-    for {str, form} <- @ill, do: IO.puts str
-  end
-
   test "simple expression" do
-    f = form do
+    _ = form do
       exists(x) do p(x) | q(x) end <> (exists(x) do p(x) end | exists(x) do q(x) end)
     end
-    # IO.puts ">> "
-    # f |> IO.inspect
   end
 end
 

@@ -216,7 +216,7 @@ defmodule Folderol.Parser do
   end
   def parse_repeat({_a, parsefn}, toks) when is_function(parsefn), do: {[], toks}
 
-  def parse_repeat1({a,parsefn}, toks) do #          (*    <phrase>a...a<phrase>  *)
+  def parse_repeat1({a,parsefn}, toks) do      #          (*    <phrase>a...a<phrase>  *)
       {u, toks2} = parsefn.(toks)
       apfst(&(cons u, &1), parse_repeat({a, parsefn}, toks2))
   end
