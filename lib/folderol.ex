@@ -133,9 +133,9 @@ defmodule Folderol do
 end
 
 defmodule Folderol.Logic do
-  import Folderol
-
-  # (*Operations on terms and formulae*)
+  @moduledoc """
+  (*Operations on terms and formulae*)
+  """
 
   @doc "Replace the atomic term u by new throughout a term"
   @spec replace_term({Folderol.logic_term, Folderol.logic_term},
@@ -154,19 +154,50 @@ defmodule Folderol.Logic do
   def abstract(t, form) do
     do_abstract(t, 0, form)
   end
-  defp do_abstract(t, i, {:Pred ,a, ts}), do: {:Pred, a, Enum.map(ts, &(replace_term({t, {:Bound, i}}, &1)))}
-  defp do_abstract(t, i, {:Conn, b, as}), do: {:Conn, b, Enum.map(as, &(do_abstract(t, i, &1)))}
-  defp do_abstract(t, i, {:Quant, q, b, a}), do: {:Quant, q, b, do_abstract(t, i+1, a)}
+  defp do_abstract(t, i, {:Pred ,a, ts}) do
+    {:Pred, a, Enum.map(ts, &(replace_term({t, {:Bound, i}}, &1)))}
+  end
+  defp do_abstract(t, i, {:Conn, b, as}) do
+    {:Conn, b, Enum.map(as, &(do_abstract(t, i, &1)))}
+  end
+  defp do_abstract(t, i, {:Quant, q, b, a}) do
+    {:Quant, q, b, do_abstract(t, i+1, a)}
+  end
 
   @doc "Replace (Bound 0) in formula with t (containing no bound vars)."
   @spec subst_bound(Folderol.logic_term, Folderol.logic_form) :: Folderol.logic_form
   def subst_bound(t, form) do
     do_subst(t, 0, form)
   end
+  defp do_subst(t, i, {:Pred,  a, ts}) do
+    {:Pred, a, Enum.map(ts, &(replace_term({{:Bound, i}, t}, &1)))}
+  end
+  defp do_subst(t, i, {:Conn,  b, as}) do
+    {:Conn, b, Enum.map(as, &(do_subst(t, i, &1)))}
+  end
+  defp do_subst(t, i, {:Quant, q, b, a}) do
+    {:Quant, q, b, do_subst(t, i+1, a)}
+  end
 
-  defp do_subst(t, i, {:Pred,  a, ts}), do: {:Pred, a, Enum.map(ts, &(replace_term({{:Bound, i}, t}, &1)))}
-  defp do_subst(t, i, {:Conn,  b, as}), do: {:Conn, b, Enum.map(as, &(do_subst(t, i, &1)))}
-  defp do_subst(t, i, {:Quant, q, b, a}), do: {:Quant, q, b, do_subst(t, i+1, a)}
+  # (*UNIFICATION*)
+  #  exception UNIFY;
+  @doc "Look for a pair (X,z) in environment, return [z] if found, else []"
+  def lookup(key, env) do
+    case Dict.get(env, key) do
+      nil -> []
+      val -> [val]
+    end
+  end
+
+
+  def occs(env, a, {:Fun,_,ts}), do: occsl(env, a, ts)
+	def occs(env, a, {:Param,_,bs}), do: occsl(env, a, Enum.map(bs, &({:Var, &1})))
+	def occs(env, a, {:Var, b}), do: a == b || occsl(env, a, lookup(b,env))
+	def occs(_env, _a, _), do: false
+
+	def occsl(_env, _a, []), do: false
+  def occsl(env, a, [t | ts]), do: occs(env, a, t) || occsl(env, a, ts)
+
 
 end
 
@@ -202,10 +233,10 @@ defmodule Folderol.Parser do
   # Parsing a list of tokens
   def apfst(f, {x, toks}) when is_function(f, 1), do: {f.(x), toks}
   # (*Functions for constructing results*)
-  def cons(x, xs), do: [x | xs];
-  def makeFun(fu, ts), do: {:Fun, fu, ts}
-  def makePred(id, ts), do: {:Pred, id, ts}
-  def makeNeg(a), do:  {:Conn, '~', [a]}
+  def cons(x, xs),        do: [x | xs];
+  def makeFun(fu, ts),    do: {:Fun, fu, ts}
+  def makePred(id, ts),   do: {:Pred, id, ts}
+  def makeNeg(a),         do: {:Conn, '~', [a]}
   def makeConn(a, aa, b), do: {:Conn, a, [aa,b]}
   def makeQuant(q, b, a), do: {:Quant, q, b, abstract({:Fun, b, []}, a)}
 
@@ -246,6 +277,7 @@ defmodule Folderol.Parser do
   Parsing of formulae;  prec is the precedence of the operator to the left;
   parsing stops at an operator with lower precedence
   """
+  @spec parse([token]) :: {Folderol.logic_form, [token]}
   def parse([{:Key, 'ALL'}, {:Id, a}, {:Key, '.'} | toks]) do
     apfst(&(makeQuant 'ALL', a, &1), parse(toks)) end
   def parse([{:Key, 'EXISTS'}, {:Id, a}, {:Key, '.'} | toks]) do
@@ -253,10 +285,11 @@ defmodule Folderol.Parser do
   def parse(toks), do: parsefix(0, parse_atom(toks))
 
   def parsefix(prec, {a, [{:Key, co} | toks]}) do
-    if prec_of(co) < prec do {a, [{:Key, co} | toks]}
-    else parsefix(prec,
-                  apfst(&(makeConn co, a, &1),
-                        parsefix(prec_of(co), parse_atom(toks))))
+    if prec_of(co) < prec do
+      {a, [{:Key, co} | toks]}
+    else
+      parsefix(prec, apfst(&(makeConn co, a, &1),
+                           parsefix(prec_of(co), parse_atom(toks))))
     end
   end
   def parsefix(_prec, {a, toks}), do: {a, toks}
@@ -291,16 +324,16 @@ defmodule Folderol.Parser do
   def makestring(thing), do: to_string(thing) |> String.to_char_list
 
   def stringof_term({:Param, a, _}), do: a
-  def stringof_term({:Var, a}), do: '?' ++ a
-  def stringof_term({:Bound, i}), do: 'B.' ++ makestring(i)
-  def stringof_term({:Fun, a, ts}), do:  a ++ stringof_args(ts)
+  def stringof_term({:Var, a}),      do: '?' ++ a
+  def stringof_term({:Bound, i}),    do: 'B.' ++ makestring(i)
+  def stringof_term({:Fun, a, ts}),  do:  a ++ stringof_args(ts)
 
   def stringof_args([]), do: []
   def stringof_args(ts), do: ts |> Enum.map(&stringof_term/1) |> conc_list(',') |> enclose
 
   def stringof_form(_prec, {:Pred, a, ts}), do: a ++ stringof_args(ts)
   def stringof_form(_prec, {:Conn, '~', [as]}), do: '~' ++ stringof_form(prec_of('~'), as)
-  def stringof_form(prec, {:Conn, cn, [as,bs]}) do
+  def stringof_form(prec,  {:Conn, cn, [as,bs]}) do
     stringf = &(stringof_form(max(prec_of(cn), prec), &1))
     zs = stringf.(as) ++ ' ' ++ cn ++ ' ' ++ stringf.(bs)
     if prec_of(cn) <= prec, do: enclose(zs), else: zs
